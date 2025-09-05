@@ -1,5 +1,8 @@
 import streamlit as st
 import os
+import sys
+__import__('pysqlite3')
+sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 import tempfile
 from engine import (
     create_vectorstore,
