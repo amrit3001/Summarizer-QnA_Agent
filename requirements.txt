@@ -1,23 +1,25 @@
-# Core
-streamlit==1.37.1
-pandas==2.2.3
-numpy==1.26.4
+# Core LangChain + integrations
+langchain
+langchain_community
+langchain_core
+langchain-google-genai
+langchain-openai
+langchain-cohere
 
-# PDF
-pypdf==4.3.1
+# Data handling
+pandas
+yfinance
+pypdf
 
-# LangChain
-langchain==0.2.16
-langchain-community==0.2.16
-langchain-text-splitters==0.2.2
-langchain-openai==0.1.16
-langchain-google-genai==0.1.7
-langchain-cohere==0.1.5
+# Vectorstore
+chromadb
 
-# API clients
-openai==1.47.0
-google-generativeai==0.7.2
-cohere==5.5.8
+# Streamlit UI
+streamlit
 
-# Utils
-tiktoken==0.7.0
+# PDF & Text utils
+python-docx
+tiktoken
+
+# Ensure compatibility
+pydantic>=2.0
