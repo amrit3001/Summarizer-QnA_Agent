@@ -13,6 +13,7 @@ from langchain.prompts import PromptTemplate
 from langchain.chains import RetrievalQA
 from langchain_cohere import CohereEmbeddings
 from langchain_google_genai import GoogleGenerativeAI
+from langchain_openai import ChatOpenAI
 from langchain_cohere import ChatCohere
 from langchain_community.vectorstores import Chroma
 from langchain_text_splitters import RecursiveCharacterTextSplitter
