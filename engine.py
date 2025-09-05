@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 # LangChain
 from langchain.prompts import PromptTemplate
 from langchain.chains import RetrievalQA
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_cohere import CohereEmbeddings
 from langchain_google_genai import GoogleGenerativeAI
 from langchain_cohere import ChatCohere
 from langchain_community.vectorstores import Chroma
@@ -94,7 +94,7 @@ def create_or_load_vectorstore(pdf_path: str, chunk_size=1500, chunk_overlap=100
         return retriever
 
     chunks = pdf_to_text_chunks(pdf_path, chunk_size, chunk_overlap)
-    embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
+    embeddings = CohereEmbeddings(model="embed-english-v3.0", cohere_api_key=os.getenv("COHERE_API_KEY"))
     vectorstore = Chroma.from_texts(chunks, embeddings)
     retriever = vectorstore.as_retriever(search_kwargs={"k": k})
 
