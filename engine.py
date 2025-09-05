@@ -1,13 +1,14 @@
+# --- FIX for ChromaDB/SQLite on Streamlit Cloud ---
 import sys
-
-# The pysqlite3-binary package is a modern version of sqlite3
-# We are tricking Python into using it instead of the old system version
 __import__('pysqlite3')
 sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+# --- END FIX ---
+
 import os
 import streamlit as st
 from typing import Dict, Any, List, Tuple
 import pandas as pd
+import time
 
 from pydantic import BaseModel, Field
 
@@ -35,7 +36,7 @@ class ModelAnswer(BaseModel):
     answer: str
     confidence: int
 
-# --- Core Processing Functions (Cached for Performance) ---
+# --- Core Processing Functions ---
 
 def pdf_to_text_chunks(pdf_path: str, chunk_size=1500, chunk_overlap=100) -> List[str]:
     """Extract text from a PDF and split it into manageable chunks."""
@@ -46,7 +47,10 @@ def pdf_to_text_chunks(pdf_path: str, chunk_size=1500, chunk_overlap=100) -> Lis
 
 @st.cache_resource
 def create_vectorstore(pdf_path: str, chunk_size=1500, chunk_overlap=100, k=5):
-    """Build and cache the Chroma vectorstore retriever using API-based embeddings."""
+    """
+    Build and cache the Chroma vectorstore retriever using API-based embeddings.
+    NOW WITH BATCH PROCESSING to handle API rate limits.
+    """
     chunks = pdf_to_text_chunks(pdf_path, chunk_size, chunk_overlap)
 
     cohere_api_key = os.getenv("COHERE_API_KEY")
@@ -55,7 +59,38 @@ def create_vectorstore(pdf_path: str, chunk_size=1500, chunk_overlap=100, k=5):
         return None
 
     embeddings = CohereEmbeddings(model="embed-english-v3.0", cohere_api_key=cohere_api_key)
-    vectorstore = Chroma.from_texts(chunks, embeddings)
+
+    # --- BATCHING LOGIC START ---
+    batch_size = 32 # Process 32 chunks at a time, a safe number for most APIs
+    vectorstore = None
+
+    # Create a progress bar for user feedback
+    progress_bar = st.progress(0, text="Embedding document chunks...")
+
+    for i in range(0, len(chunks), batch_size):
+        batch = chunks[i:i + batch_size]
+
+        if vectorstore is None:
+            # Create the vectorstore with the first batch
+            vectorstore = Chroma.from_texts(texts=batch, embedding=embeddings)
+        else:
+            # Add subsequent batches to the existing vectorstore
+            vectorstore.add_texts(texts=batch)
+
+        # Update progress
+        progress_percentage = min((i + batch_size) / len(chunks), 1.0)
+        progress_bar.progress(progress_percentage, text=f"Embedding document chunks... {i+batch_size}/{len(chunks)}")
+
+        # A small delay to respect rate limits even more
+        time.sleep(0.5)
+
+    progress_bar.empty() # Clear the progress bar on completion
+    # --- BATCHING LOGIC END ---
+
+    if vectorstore is None:
+        st.error("Vectorstore could not be created. The document might be empty.")
+        return None
+
     return vectorstore.as_retriever(search_kwargs={"k": k})
 
 @st.cache_resource
@@ -84,7 +119,6 @@ def initialize_models_and_chains(_retriever, model_selection: List[str]) -> Tupl
     return chains, reconciler
 
 # --- Response Generation ---
-
 def get_verified_response(question: str, retriever, chains: Dict[str, Any], reconciler: Any) -> Tuple[str, Dict[str, ModelAnswer]]:
     """Query all selected models and use a reconciler to generate a final verified answer."""
     per_model_answers = {}
@@ -114,7 +148,6 @@ def get_verified_response(question: str, retriever, chains: Dict[str, Any], reco
     return final_answer, per_model_answers
 
 # --- Market Data Utility ---
-
 def get_market_snapshot_md(ticker_symbol: str) -> str:
     """Fetch and format a Markdown table of live market data for a given stock ticker."""
     import yfinance as yf
