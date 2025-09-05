@@ -126,7 +126,7 @@ def initialize_models_and_chains(model_subset, retriever, qa_prompt=None, reconc
         )
         chains[name] = chain
 
-    reconciler = ChatOpenAI(model="gpt-4o-mini", temperature=0.1)
+    reconciler = ChatCohere(model="command-r-plus", temperature=0.1, cohere_api_key=os.getenv("COHERE_API_KEY"))
     return chains, reconciler
 
 # --------------------------
