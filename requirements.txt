@@ -1,4 +1,4 @@
-# Core LangChain + integrations
+Core LangChain + integrations
 langchain
 langchain_community
 langchain_core
@@ -6,22 +6,25 @@ langchain-google-genai
 langchain-openai
 langchain-cohere
 
-# Data handling & Vectorstore
+Data handling & Vectorstore
 pandas
 yfinance
 pypdf
 chromadb
 
-# Embeddings
-sentence-transformers==2.7.0
-torch==2.2.0
-transformers==4.40.0
+Embeddings & AI Models (Let pip handle versions for compatibility)
+sentence-transformers
+torch
+transformers
 
-# Streamlit UI
+Streamlit UI
 streamlit
 
-# PDF & Text utils
+PDF & Text utils
 tiktoken
 
-# Ensure compatibility
+Ensure compatibility
 pydantic>=2.0
+
+Often needed by chromadb/sentence-transformers to avoid libGL errors
+opencv-python-headless
