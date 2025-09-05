@@ -6,18 +6,26 @@ langchain-google-genai
 langchain-openai
 langchain-cohere
 
-# Data handling & Vectorstore
+# Data handling & Vectorstore (Using FAISS for local embeddings)
 pandas
 yfinance
 pypdf
-chromadb
+faiss-cpu
 pysqlite3-binary
+
+# Local Embeddings & ML
+sentence-transformers
+torch
+transformers
 
 # Streamlit UI
 streamlit
 
 # PDF & Text utils
 tiktoken
+
+# API Key Management for local development
+python-dotenv
 
 # Ensure compatibility
 pydantic>=2.0
