@@ -1,6 +1,7 @@
 import os
 import streamlit as st
 from typing import Dict, Any, List, Tuple
+import pandas as pd
 
 from pydantic import BaseModel, Field
 
@@ -39,10 +40,9 @@ def pdf_to_text_chunks(pdf_path: str, chunk_size=1500, chunk_overlap=100) -> Lis
 
 @st.cache_resource
 def create_vectorstore(pdf_path: str, chunk_size=1500, chunk_overlap=100, k=5):
-    """Build and cache the Chroma vectorstore retriever from a PDF."""
+    """Build and cache the Chroma vectorstore retriever using API-based embeddings."""
     chunks = pdf_to_text_chunks(pdf_path, chunk_size, chunk_overlap)
 
-    # Ensure Cohere API key is available for embedding
     cohere_api_key = os.getenv("COHERE_API_KEY")
     if not cohere_api_key:
         st.error("Cohere API key not found in secrets. It's required for embeddings.")
@@ -86,27 +86,16 @@ def get_verified_response(question: str, retriever, chains: Dict[str, Any], reco
     for model_name, chain in chains.items():
         try:
             result = chain.run(question)
-            # Simple parsing attempt, can be made more robust
             confidence = 75 if "not found" not in result.lower() else 25
             per_model_answers[model_name] = ModelAnswer(answer=result, confidence=confidence)
         except Exception as e:
             per_model_answers[model_name] = ModelAnswer(answer=f"Error processing with {model_name}: {e}", confidence=0)
 
-    # Prepare input for the reconciler model
     answers_context = "\n\n".join([f"--- Answer from {name} (Confidence: {res.confidence}) ---\n{res.answer}" for name, res in per_model_answers.items()])
     reconciler_prompt = f"""You are a senior financial analyst. Your task is to synthesize the best possible answer to a user's question based on responses from several AI models.
-
     User's Question: "{question}"
-
-    Provided AI Answers:
-    {answers_context}
-
-    Your Task:
-    1.  Analyze all answers. Identify points of agreement and disagreement.
-    2.  Filter out any errors, apologies, or irrelevant information.
-    3.  Construct a single, comprehensive, and well-structured final answer that directly addresses the user's question.
-    4.  Do not mention the other models. Present the final answer as your own expert analysis.
-
+    Provided AI Answers:\n{answers_context}\n
+    Your Task: Analyze all answers. Identify points of agreement and disagreement. Filter out errors. Construct a single, comprehensive, and well-structured final answer. Do not mention the other models. Present the final answer as your own expert analysis.
     Final Verified Answer:
     """
 
@@ -123,7 +112,6 @@ def get_verified_response(question: str, retriever, chains: Dict[str, Any], reco
 def get_market_snapshot_md(ticker_symbol: str) -> str:
     """Fetch and format a Markdown table of live market data for a given stock ticker."""
     import yfinance as yf
-    import pandas as pd
     try:
         ticker = yf.Ticker(ticker_symbol)
         info = ticker.info
