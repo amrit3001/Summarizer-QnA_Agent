@@ -3,7 +3,6 @@ langchain
 langchain_community
 langchain_core
 langchain-google-genai
-langchain-openai
 langchain-cohere
 
 # Data handling
