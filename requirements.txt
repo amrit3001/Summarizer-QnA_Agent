@@ -11,6 +11,7 @@ pandas
 yfinance
 pypdf
 chromadb
+pysqlite3-binary # <-- ADDED THIS LINE to install a modern SQLite
 
 # Streamlit UI
 streamlit
