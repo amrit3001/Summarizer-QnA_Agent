@@ -1,4 +1,4 @@
-Tell pip to look for CPU-only versions of PyTorch first
+Let pip look for smaller, CPU-only versions of PyTorch first
 --find-links https://www.google.com/search?q=https://download.pytorch.org/whl/cpu/torch_stable.html
 
 Core LangChain + integrations
@@ -15,10 +15,9 @@ yfinance
 pypdf
 chromadb
 
-Embeddings & AI Models
+Embeddings & AI Models (Let sentence-transformers pull its own dependencies)
 sentence-transformers
-torch --platform manylinux2014_x86_64 # Specify CPU version
-transformers
+torch # We let pip find the correct CPU version from the link above
 
 Streamlit UI
 streamlit
@@ -29,5 +28,5 @@ tiktoken
 Ensure compatibility
 pydantic>=2.0
 
-Often needed by chromadb/sentence-transformers to avoid libGL errors
+Critical for avoiding hidden GUI-related dependency errors on headless servers
 opencv-python-headless
