@@ -1,7 +1,4 @@
-Let pip look for smaller, CPU-only versions of PyTorch first
---find-links https://www.google.com/search?q=https://download.pytorch.org/whl/cpu/torch_stable.html
-
-Core LangChain + integrations
+# Core LangChain + integrations
 langchain
 langchain_community
 langchain_core
@@ -9,24 +6,17 @@ langchain-google-genai
 langchain-openai
 langchain-cohere
 
-Data handling & Vectorstore
+# Data handling & Vectorstore
 pandas
 yfinance
 pypdf
 chromadb
 
-Embeddings & AI Models (Let sentence-transformers pull its own dependencies)
-sentence-transformers
-torch # We let pip find the correct CPU version from the link above
-
-Streamlit UI
+# Streamlit UI
 streamlit
 
-PDF & Text utils
+# PDF & Text utils
 tiktoken
 
-Ensure compatibility
+# Ensure compatibility
 pydantic>=2.0
-
-Critical for avoiding hidden GUI-related dependency errors on headless servers
-opencv-python-headless
