@@ -1,3 +1,9 @@
+import sys
+
+# The pysqlite3-binary package is a modern version of sqlite3
+# We are tricking Python into using it instead of the old system version
+__import__('pysqlite3')
+sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 import os
 import streamlit as st
 from typing import Dict, Any, List, Tuple
