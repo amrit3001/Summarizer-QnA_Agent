@@ -6,14 +6,11 @@ langchain-google-genai
 langchain-openai
 langchain-cohere
 
-# Data handling
+# Data handling & Vectorstore
 pandas
 yfinance
 pypdf
-pymupdf
-unstructured[pdf]   # slimmed, instead of unstructured[all-docs]
-rank_bm25
-faiss-cpu
+chromadb
 
 # Embeddings
 sentence-transformers==2.7.0
@@ -24,11 +21,7 @@ transformers==4.40.0
 streamlit
 
 # PDF & Text utils
-python-docx
 tiktoken
-
-# Fix ImportError (no libGL dependency)
-opencv-python-headless
 
 # Ensure compatibility
 pydantic>=2.0
