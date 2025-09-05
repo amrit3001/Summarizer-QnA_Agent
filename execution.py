@@ -1,79 +1,64 @@
-# --- FIX for ChromaDB/SQLite on Streamlit Cloud ---
-import sys
-__import__('pysqlite3')
-sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
-# --- END FIX ---
-
 import streamlit as st
 import os
 import tempfile
 from engine import (
-    create_vectorstore,
+    load_local_api_keys,
+    create_vectorstore_local,
     initialize_models_and_chains,
     get_verified_response,
     get_market_snapshot_md,
     MODEL_CONFIG
 )
 
-# --- Page Config & Load Secrets ---
-st.set_page_config(page_title="Finanlyze AI", layout="wide", page_icon="📊")
+# --- Load API keys from .env file at the very start ---
+load_local_api_keys()
 
-# This block should be at the very top to ensure env variables are set
-for key in ["GOOGLE_API_KEY", "OPENROUTER_API_KEY", "COHERE_API_KEY"]:
-    if key in st.secrets:
-        os.environ[key] = st.secrets[key]
+# --- Page Config & State ---
+st.set_page_config(page_title="Finanlyze AI (Local)", layout="wide", page_icon="📊")
 
-# --- Session State Initialization ---
 if "app_state" not in st.session_state:
     st.session_state.app_state = {
         "retriever": None,
         "chains": None,
         "reconciler": None,
-        "pdf_path": None,
         "ticker": "MSFT" # Default ticker
     }
 
-# --- UI: Sidebar for Setup & Controls ---
+# --- UI Sidebar ---
 with st.sidebar:
-    st.header("Setup")
-    st.markdown("Upload a financial report PDF and select the AI models to power the analysis.")
-
+    st.header("Setup (Local Mode)")
+    st.markdown("This app runs locally, using your computer's resources for embedding.")
+    
     uploaded_file = st.file_uploader("Upload Annual Report", type=["pdf"])
     ticker_input = st.text_input("Enter Stock Ticker", value=st.session_state.app_state["ticker"])
-
+    
     st.markdown("---")
     st.subheader("Model Selection")
     model_selection = [name for name in MODEL_CONFIG if st.checkbox(name.capitalize(), value=True)]
 
-    if st.button("Process Document & Initialize Models", use_container_width=True):
+    if st.button("Process Document", use_container_width=True):
         if uploaded_file and ticker_input and model_selection:
-            with st.spinner("Processing PDF and warming up AI models..."):
-                # Save uploaded file temporarily
+            with st.spinner("Processing PDF on your local machine... This might take a moment the first time as the model downloads."):
                 with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tfile:
                     tfile.write(uploaded_file.read())
-                    st.session_state.app_state["pdf_path"] = tfile.name
-
-                # Update ticker
+                    pdf_path = tfile.name
+                
                 st.session_state.app_state["ticker"] = ticker_input
-
-                # Core processing steps
-                st.session_state.app_state["retriever"] = create_vectorstore(st.session_state.app_state["pdf_path"])
-
+                st.session_state.app_state["retriever"] = create_vectorstore_local(pdf_path)
+                
                 if st.session_state.app_state["retriever"]:
                     chains, reconciler = initialize_models_and_chains(st.session_state.app_state["retriever"], model_selection)
                     st.session_state.app_state["chains"] = chains
                     st.session_state.app_state["reconciler"] = reconciler
                     st.success("Ready to analyze!")
-                else:
-                    st.error("Failed to process the document.")
         else:
-            st.warning("Please upload a file, enter a ticker, and select at least one model.")
+            st.warning("Please provide a file, ticker, and select at least one model.")
 
-# --- Main Content Area ---
-st.title("📊 Finanlyze AI: Financial Report Assistant")
+# --- Main Content ---
+st.title("📊 Finanlyze AI: Local Financial Assistant")
 
 if not st.session_state.app_state.get("chains"):
-    st.info("Welcome! Please upload a document and initialize the models using the sidebar to begin.")
+    st.info("Welcome! Upload a document and process it to begin.")
 else:
     st.header("Company Snapshot")
     st.markdown(get_market_snapshot_md(st.session_state.app_state["ticker"]))
