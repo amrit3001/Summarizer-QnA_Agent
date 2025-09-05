@@ -1,116 +1,115 @@
-# execution.py (Lite version)
-
 import streamlit as st
+import os
 import tempfile
 from engine import (
-    create_or_load_vectorstore,
+    create_vectorstore,
     initialize_models_and_chains,
     get_verified_response,
-    market_snapshot_md,
-    ModelAnswer,
+    get_market_snapshot_md,
     MODEL_CONFIG
 )
 
-# Load secrets into environment variables
-import os
-if "GOOGLE_API_KEY" in st.secrets:
-    os.environ["GOOGLE_API_KEY"] = st.secrets["GOOGLE_API_KEY"]
+# --- Page Config & Load Secrets ---
+st.set_page_config(page_title="Finanlyze AI", layout="wide", page_icon="📊")
 
-if "OPENROUTER_API_KEY" in st.secrets:
-    os.environ["OPENROUTER_API_KEY"] = st.secrets["OPENROUTER_API_KEY"]
+# This block should be at the very top to ensure env variables are set
+for key in ["GOOGLE_API_KEY", "OPENROUTER_API_KEY", "COHERE_API_KEY"]:
+    if key in st.secrets:
+        os.environ[key] = st.secrets[key]
 
-if "COHERE_API_KEY" in st.secrets:
-    os.environ["COHERE_API_KEY"] = st.secrets["COHERE_API_KEY"]
+# --- Session State Initialization ---
+if "app_state" not in st.session_state:
+    st.session_state.app_state = {
+        "retriever": None,
+        "chains": None,
+        "reconciler": None,
+        "pdf_path": None,
+        "ticker": "MSFT" # Default ticker
+    }
 
-st.set_page_config(page_title="Financial Report Q&A Assistant", layout="wide")
-st.title("📊 Financial Report Q&A Assistant (Demo)")
-
-# Sidebar
+# --- UI: Sidebar for Setup & Controls ---
 with st.sidebar:
-    st.header("Upload & Settings")
-    uploaded_file = st.file_uploader("Upload Annual Report (PDF)", type=["pdf"])
-    ticker = st.text_input("Stock Ticker", value="RELIANCE.NS")
+    st.header("Setup")
+    st.markdown("Upload a financial report PDF and select the AI models to power the analysis.")
+
+    uploaded_file = st.file_uploader("Upload Annual Report", type=["pdf"])
+    ticker_input = st.text_input("Enter Stock Ticker", value=st.session_state.app_state["ticker"])
+
     st.markdown("---")
-    st.subheader("Model toggles")
-    use_gemini = st.checkbox("Gemini (Google)", value=True)
-    use_deepseek = st.checkbox("DeepSeek (OpenRouter)", value=True)
-    use_cohere = st.checkbox("Cohere", value=True)
+    st.subheader("Model Selection")
+    model_selection = [name for name in MODEL_CONFIG if st.checkbox(name.capitalize(), value=True)]
+
+    if st.button("Process Document & Initialize Models", use_container_width=True):
+        if uploaded_file and ticker_input and model_selection:
+            with st.spinner("Processing PDF and warming up AI models..."):
+                # Save uploaded file temporarily
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tfile:
+                    tfile.write(uploaded_file.read())
+                    st.session_state.app_state["pdf_path"] = tfile.name
+
+                # Update ticker
+                st.session_state.app_state["ticker"] = ticker_input
+
+                # Core processing steps
+                st.session_state.app_state["retriever"] = create_vectorstore(st.session_state.app_state["pdf_path"])
+
+                if st.session_state.app_state["retriever"]:
+                    chains, reconciler = initialize_models_and_chains(st.session_state.app_state["retriever"], model_selection)
+                    st.session_state.app_state["chains"] = chains
+                    st.session_state.app_state["reconciler"] = reconciler
+                    st.success("Ready to analyze!")
+                else:
+                    st.error("Failed to process the document.")
+        else:
+            st.warning("Please upload a file, enter a ticker, and select at least one model.")
+
+# --- Main Content Area ---
+st.title("📊 Finanlyze AI: Financial Report Assistant")
+
+if not st.session_state.app_state.get("chains"):
+    st.info("Welcome! Please upload a document and initialize the models using the sidebar to begin.")
+else:
+    st.header("Company Snapshot")
+    st.markdown(get_market_snapshot_md(st.session_state.app_state["ticker"]))
     st.markdown("---")
-    run_analysis_btn = st.button("📊 Generate Full Analysis")
-    st.write("")
-    st.subheader("Q&A")
-    question_input = st.text_input("Ask a question from the uploaded report")
-    ask_btn = st.button("💬 Ask")
 
-# Session state
-if "retriever" not in st.session_state:
-    st.session_state.retriever = None
-if "chains" not in st.session_state:
-    st.session_state.chains = None
-if "reconciler" not in st.session_state:
-    st.session_state.reconciler = None
-if "pdf_path" not in st.session_state:
-    st.session_state.pdf_path = None
+    tab1, tab2 = st.tabs(["Automated Analysis", "Interactive Q&A"])
 
-# Upload handling
-if uploaded_file is not None and st.session_state.retriever is None:
-    with st.spinner("Processing PDF & building vectorstore..."):
-        t = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
-        t.write(uploaded_file.read())
-        t.flush()
-        t.close()
-        st.session_state.pdf_path = t.name
-
-        retriever = create_or_load_vectorstore(t.name, chunk_size=1500, chunk_overlap=100, k=5)
-        st.session_state.retriever = retriever
-        st.success("✅ Vectorstore ready (cached by PDF hash).")
-
-# Model init
-if st.session_state.retriever and st.session_state.chains is None:
-    with st.spinner("Initializing LLMs and RAG chains..."):
-        selected_models = {}
-        if use_gemini: selected_models["gemini"] = MODEL_CONFIG["gemini"]
-        if use_deepseek: selected_models["deepseek"] = MODEL_CONFIG["deepseek"]
-        if use_cohere: selected_models["cohere"] = MODEL_CONFIG["cohere"]
-
-        chains, reconciler = initialize_models_and_chains(selected_models, st.session_state.retriever, None, None)
-        st.session_state.chains = chains
-        st.session_state.reconciler = reconciler
-        st.success("✅ Models & chains initialized.")
-
-# Run analysis
-if run_analysis_btn:
-    if not st.session_state.retriever:
-        st.warning("Upload a PDF first.")
-    else:
-        st.subheader("📈 Company Snapshot")
-        st.markdown(market_snapshot_md(ticker))
-        st.subheader("🔎 Automated Analysis")
-        for title, instructions in {
-            "Growth Analysis": "Find current and previous year 'Revenue' and 'EBITDA'/'EBIT' and compute YoY growth.",
-            "Profitability Analysis": "Calculate margins and DuPont ROE.",
-            "Liquidity and Solvency": "Current & Quick ratio, interest cover, net debt/EBITDA.",
-            "Efficiency and Working Capital": "CCC, DIO, DSO, DPO.",
-            "Cash Flow and Dividends": "FCF and payout ratio."
-        }.items():
-            with st.expander(title):
-                final, per_model = get_verified_response(instructions, st.session_state.retriever, st.session_state.chains, st.session_state.reconciler)
-                st.markdown(final)
-                if st.checkbox(f"Show per-model answers for {title}", key=f"show_models_{title}"):
-                    for m, ma in per_model.items():
-                        st.markdown(f"**{m}** (confidence: {ma.confidence})\n\n{ma.answer}")
-
-# Q&A
-if ask_btn:
-    if not st.session_state.retriever:
-        st.warning("Upload a PDF first.")
-    elif not question_input.strip():
-        st.warning("Enter a question.")
-    else:
-        with st.spinner("Querying models..."):
-            final, per_model = get_verified_response(question_input, st.session_state.retriever, st.session_state.chains, st.session_state.reconciler)
-        st.subheader("✅ Verified Answer")
-        st.markdown(final)
-        if st.checkbox("Show per-model answers", key="show_per_model_q"):
-            for m, ma in per_model.items():
-                st.markdown(f"**{m}** (confidence: {ma.confidence})\n\n{ma.answer}")
+    with tab1:
+        st.subheader("Generate a Report")
+        analysis_prompts = {
+            "Growth Analysis": "Find current and previous year 'Revenue' and 'EBITDA'/'EBIT', then compute YoY growth. Quote numbers and show calculations.",
+            "Profitability Analysis": "Calculate Gross, Operating, and Net Profit margins for the most recent year. Also, perform a DuPont ROE analysis.",
+            "Liquidity & Solvency": "Calculate the Current Ratio, Quick Ratio, Interest Coverage Ratio, and Net Debt to EBITDA ratio for the most recent year.",
+        }
+        for title, prompt in analysis_prompts.items():
+            if st.button(f"Analyze {title}", key=title, use_container_width=True):
+                with st.expander(title, expanded=True):
+                    with st.spinner(f"Running {title}..."):
+                        final_answer, per_model = get_verified_response(
+                            prompt,
+                            st.session_state.app_state["retriever"],
+                            st.session_state.app_state["chains"],
+                            st.session_state.app_state["reconciler"]
+                        )
+                        st.markdown(final_answer)
+                        if st.checkbox("Show individual model answers", key=f"details_{title}"):
+                            st.json({k: v.dict() for k, v in per_model.items()})
+    with tab2:
+        st.subheader("Ask a Custom Question")
+        question_input = st.text_input("Enter your question about the report:", key="qa_input")
+        if st.button("Get Answer", key="qa_button"):
+            if question_input.strip():
+                with st.spinner("Querying models and verifying answer..."):
+                    final_answer, per_model = get_verified_response(
+                        question_input,
+                        st.session_state.app_state["retriever"],
+                        st.session_state.app_state["chains"],
+                        st.session_state.app_state["reconciler"]
+                    )
+                    st.markdown("#### Verified Answer")
+                    st.info(final_answer)
+                    with st.expander("View individual model answers"):
+                        st.json({k: v.dict() for k, v in per_model.items()})
+            else:
+                st.warning("Please enter a question.")
