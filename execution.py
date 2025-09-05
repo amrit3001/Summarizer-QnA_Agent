@@ -1,8 +1,11 @@
-import streamlit as st
-import os
+# --- FIX for ChromaDB/SQLite on Streamlit Cloud ---
 import sys
 __import__('pysqlite3')
 sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+# --- END FIX ---
+
+import streamlit as st
+import os
 import tempfile
 from engine import (
     create_vectorstore,
