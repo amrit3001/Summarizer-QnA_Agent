@@ -1,3 +1,6 @@
+Tell pip to look for CPU-only versions of PyTorch first
+--find-links https://www.google.com/search?q=https://download.pytorch.org/whl/cpu/torch_stable.html
+
 Core LangChain + integrations
 langchain
 langchain_community
@@ -12,9 +15,9 @@ yfinance
 pypdf
 chromadb
 
-Embeddings & AI Models (Let pip handle versions for compatibility)
+Embeddings & AI Models
 sentence-transformers
-torch
+torch --platform manylinux2014_x86_64 # Specify CPU version
 transformers
 
 Streamlit UI
