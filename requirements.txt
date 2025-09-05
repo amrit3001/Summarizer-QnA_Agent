@@ -3,15 +3,22 @@ langchain
 langchain_community
 langchain_core
 langchain-google-genai
+langchain-openai
 langchain-cohere
 
 # Data handling
 pandas
 yfinance
 pypdf
+pymupdf
+unstructured[pdf]   # slimmed, instead of unstructured[all-docs]
+rank_bm25
+faiss-cpu
 
-# Vectorstore
-chromadb
+# Embeddings
+sentence-transformers==2.7.0
+torch==2.2.0
+transformers==4.40.0
 
 # Streamlit UI
 streamlit
@@ -19,6 +26,9 @@ streamlit
 # PDF & Text utils
 python-docx
 tiktoken
+
+# Fix ImportError (no libGL dependency)
+opencv-python-headless
 
 # Ensure compatibility
 pydantic>=2.0
