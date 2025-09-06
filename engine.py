@@ -49,16 +49,10 @@ def pdf_to_text_chunks(pdf_path: str, chunk_size=1500, chunk_overlap=100) -> Lis
 def create_vectorstore_local(pdf_path: str, chunk_size=1500, chunk_overlap=100, k=5):
     """
     Build and cache the FAISS vectorstore retriever using a local sentence-transformer model.
-    This runs on your CPU/GPU and makes no API calls.
     """
     chunks = pdf_to_text_chunks(pdf_path, chunk_size, chunk_overlap)
-    
-    # Use a local embedding model
     embeddings = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL_NAME)
-    
-    # Use FAISS, which is highly efficient for local, in-memory vectorstores.
     vectorstore = FAISS.from_texts(texts=chunks, embedding=embeddings)
-    
     return vectorstore.as_retriever(search_kwargs={"k": k})
 
 @st.cache_resource
@@ -109,24 +103,42 @@ def get_verified_response(question: str, retriever, chains: Dict[str, Any], reco
         final_answer = f"**Reconciliation Failed:** {e}"
     return final_answer, per_model_answers
 
-# --- Market Data Utility ---
+# --- Market Data Utility (Corrected) ---
 def get_market_snapshot_md(ticker_symbol: str) -> str:
-    """Fetch and format a Markdown table of live market data."""
+    """Fetch and format a Markdown table of live market data. More robust version."""
     import yfinance as yf
     try:
         ticker = yf.Ticker(ticker_symbol)
         info = ticker.info
-        if not info or 'longName' not in info: return f"Could not retrieve data for '{ticker_symbol}'."
-        def fmt(val):
+        if not info or 'longName' not in info:
+            return f"⚠️ Could not retrieve valid market data for ticker '{ticker_symbol}'. Please check the symbol."
+
+        def fmt_num(val, is_currency=False):
             if val is None: return "N/A"
             try:
                 n = float(val)
-                if n >= 1e12: return f"{n / 1e12:.2f} T"
-                if n >= 1e9:  return f"{n / 1e9:.2f} B"
-                if n >= 1e6:  return f"{n / 1e6:.2f} M"
-                return f"{int(n):,}"
+                currency_prefix = info.get('currency', '') + " " if is_currency else ""
+                if n >= 1e12: return f"{currency_prefix}{n / 1e12:.2f} T"
+                if n >= 1e9:  return f"{currency_prefix}{n / 1e9:.2f} B"
+                if n >= 1e6:  return f"{currency_prefix}{n / 1e6:.2f} M"
+                return f"{currency_prefix}{n:,.2f}"
             except (ValueError, TypeError): return "N/A"
-        data = { "Metric": ["**Market Price**", "52-Week Range", "Mkt Cap"], "Value": [ f"**{info.get('regularMarketPrice', 'N/A')} {info.get('currency', '')}**", f"{info.get('fiftyTwoWeekLow', 'N/A')} - {info.get('fiftyTwoWeekHigh', 'N/A')}", f"{fmt(info.get('marketCap'))} {info.get('currency', '')}" ] }
-        df = pd.DataFrame(data)
-        return f"### {info.get('longName', 'N/A')} ({ticker_symbol.upper()})\n\n{df.to_markdown(index=False)}"
-    except Exception as e: return f"Error fetching market data: {e}"
+
+        def fmt_pct(val):
+            if val is None: return "N/A"
+            return f"{val * 100:.2f}%"
+
+        md_string = f"### Live Market Snapshot: {info.get('longName', 'N/A')} ({ticker_symbol.upper()})\n\n"
+        md_string += "| Metric | Value |\n"
+        md_string += "|:---|:---|\n"
+        md_string += f"| **Market Price** | **{fmt_num(info.get('regularMarketPrice'), is_currency=True)}** |\n"
+        md_string += f"| Previous Close | {fmt_num(info.get('previousClose'), is_currency=True)} |\n"
+        md_string += f"| 52-Week Range | {fmt_num(info.get('fiftyTwoWeekLow'))} - {fmt_num(info.get('fiftyTwoWeekHigh'))} |\n"
+        md_string += f"| Market Cap | {fmt_num(info.get('marketCap'), is_currency=True)} |\n"
+        md_string += f"| Avg. Volume | {fmt_num(info.get('averageVolume'))} |\n"
+        md_string += f"| P/E Ratio (TTM) | {fmt_num(info.get('trailingPE'))} |\n"
+        md_string += f"| Dividend Yield | {fmt_pct(info.get('dividendYield'))} |\n"
+        
+        return md_string
+    except Exception as e:
+        return f"⚠️ An error occurred while fetching market data: {e}"
